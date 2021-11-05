@@ -1,0 +1,101 @@
+name: Upgrade version & Deploy to Exchange
+on:
+  workflow_dispatch:
+
+jobs:
+          
+  createSettings:
+    name: Create settings.xml
+    runs-on: ubuntu-latest
+    steps:
+    - name: Get access token
+      run: |
+        echo "ACCESS_TOKEN=$(curl -s "https://anypoint.mulesoft.com/accounts/api/v2/oauth2/token" -X POST -H "Content-Type: application/json" -d "{\"grant_type\": \"client_credentials\", \"client_id\": \"${{ secrets.APP_CLIENT_ID }}\", \"client_secret\": \"${{ secrets.APP_CLIENT_SECRET }}\"}" | sed -n 's|.*"access_token":"\([^"]*\)".*|\1|p')" >> $GITHUB_ENV
+      shell: bash 
+    - name: Configure setting.xml with Anypoint Platform credentials
+      uses: whelk-io/maven-settings-xml-action@v20
+      with:
+        output_file: settings.xml
+        repositories: >
+          [
+            {
+              "id": "MuleRepository",
+              "name": "MuleRepository",
+              "url": "https://repository.mulesoft.org/nexus-ee/content/repositories/releases-ee/",
+              "releases": {
+                "enabled": "true"
+              },
+              "snapshots": {
+                "enabled": "true"
+              }
+            }
+          ]
+        servers: >
+          [
+            {
+              "id": "anypoint-exchange-v2",
+              "username": "~~~Token~~~",
+              "password": "${{ env.ACCESS_TOKEN }}"
+            },
+            {
+              "id": "mulesoft-releases",
+              "username": "~~~Token~~~",
+              "password": "${{ env.ACCESS_TOKEN }}"
+            },
+            {
+              "id": "MuleRepository",
+              "username": "${{ secrets.REPO_USERNAME }}",
+              "password": "${{ secrets.REPO_PASSWORD }}"
+            },
+            {
+              "id": "github",
+              "username": "${{ secrets.USERNAME }}",
+              "password": "${{ secrets.GIT_TOKEN }}"
+            },
+            {
+              "id": "Repository",
+              "username": "${{ secrets.USERNAME }}",
+              "password": "${{ secrets.PASSWORD }}"
+            }
+          ]
+    - name: Upload settings.xml
+      uses: actions/upload-artifact@v2
+      with:
+        name: settings
+        path: settings.xml
+        
+  test:
+    name: Test
+    needs: [createSettings]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Mule App
+        uses: manuelrbrizi/deploy-to-cloudhub-action/testWithoutReports@main
+        with:
+          testParams: -Dmule.env=dev -Dmule.key=${{ secrets.MULE_KEY }} -Dapi.id=00000000
+          
+  updateVersion:
+    name: Update release version
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update version
+        uses: manuelrbrizi/deploy-to-cloudhub-action/updateVersion@main
+        
+  buildJar:
+    name: Build project and export JAR
+    needs: [updateVersion]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build JAR
+        uses: manuelrbrizi/deploy-to-cloudhub-action/buildJar@main
+          
+  deployXC:
+    name: Deploy to Exchange
+    needs: [buildJar]
+    runs-on: ubuntu-latest
+    steps:
+      - name: deployToExchange
+        uses: manuelrbrizi/deploy-to-cloudhub-action/deployToExchange@main
+        with:
+          projectName: spending-eapi-impl

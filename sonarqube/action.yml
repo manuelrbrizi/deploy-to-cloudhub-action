@@ -1,0 +1,28 @@
+name: SonarQube 
+description: Action to test quality code with SonarQube
+
+inputs:
+  sourcesPath:
+    description: Path to Mule configurations files (.xml)
+    required: true
+    
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v2
+    - uses: docker-practice/actions-setup-docker@master
+    
+    - name: Download settings.xml
+      uses: actions/download-artifact@v2
+      with:
+        name: settings
+    
+    - name: Get and run Docker image
+      run: |
+        docker pull fperezpa/mulesonarqube:7.7.3
+        docker run -d --name sonarqube -p 9000:9000 -p 9092:9092 fperezpa/mulesonarqube:7.7.3
+      shell: bash
+   
+    - name: Test code
+      run: mvn sonar:sonar -e -s settings.xml -Dsonar.host.url=http://localhost:9000 -Dsonar.sources=${{ inputs.sourcesPath }} -Dsonar.lang.patterns.xml=flowxml
+      shell: bash

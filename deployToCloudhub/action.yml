@@ -1,0 +1,33 @@
+name: Deploy to Cloudhub
+description: Action to deploy Mule Apps
+
+inputs:
+  deployParams:
+    description: Parameters for Maven deploy goal (must include all -D directives)
+    required: true
+    
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v2
+    
+    - name: Download settings.xml
+      uses: actions/download-artifact@v2
+      with:
+        name: settings
+        
+    - name: Set up JDK 8
+      uses: actions/setup-java@v2
+      with:
+        java-version: '8'
+        distribution: 'adopt'
+        
+    - name: Download jarfile
+      uses: actions/download-artifact@v2
+      with:
+        name: deployJar
+      
+    - name: Deploy to CloudHub
+      run: |
+         mvn mule:deploy -Dmule.artifact=deployableJar.jar -e -s settings.xml -DskipTests ${{ inputs.deployParams }}
+      shell: bash

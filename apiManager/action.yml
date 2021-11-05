@@ -1,0 +1,68 @@
+name: Deploy to Api Manager
+description: Action to upload Mule Apps to API Manager
+
+inputs:
+  ORGID:
+    description: Organization ID
+    required: true
+  ENVID:
+    description: Environment ID
+    required: true
+  CLIENT_ID:
+    description: Organization client id
+    required: true
+  CLIENT_SECRET:
+    description: Organization client secret
+    required: true
+  specPath:
+    description: Path to spec.json file
+    required: true
+    
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout actions repo
+      uses: actions/checkout@v2
+      with:
+        repository: manuelrbrizi/deploy-to-cloudhub-action
+        path: thisRepo
+        
+    - name: Checkout original repo
+      uses: actions/checkout@v2
+      with:
+        repository: ${{ env.GITHUB_REPOSITORY }}
+        path: originalRepo
+    
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+        architecture: 'x64'
+        distribution: 'adopt'    
+    
+    - name: Get modules
+      run: |
+        pip3 install requests
+        pip3 install argparse
+      shell: bash
+      
+    - name: Get access token
+      run: |
+        echo "ACCESS_TOKEN=$(curl -s "https://anypoint.mulesoft.com/accounts/api/v2/oauth2/token" -X POST -H "Content-Type: application/json" -d "{\"grant_type\": \"client_credentials\", \"client_id\": \"${{ inputs.CLIENT_ID }}\", \"client_secret\": \"${{ inputs.CLIENT_SECRET }}\"}" | sed -n 's|.*"access_token":"\([^"]*\)".*|\1|p')" >> $GITHUB_ENV
+      shell: bash    
+    
+    - name: Go to API Manager
+      run: |
+        result=$(python3 thisRepo/createApi.py originalRepo/${{ inputs.specPath }})
+         echo $result > apiId.txt
+         echo $result
+      shell: bash
+      env:
+         ORGID: ${{ inputs.ORGID }}
+         ENVID: ${{ inputs.ENVID }}
+         ACCESS_TOKEN: ${{ env.ACCESS_TOKEN }}
+    
+    - name: Publish apiId.txt
+      uses: actions/upload-artifact@v2
+      with:
+        name: apiId
+        path: apiId.txt

@@ -1,0 +1,26 @@
+name: Newman 
+description: Action to test integration with Newman
+
+inputs:
+  collectionName:
+    description: Postman Collection name (with .json)
+    required: true
+    
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v2
+    
+    - uses: actions/setup-node@v2
+      with:
+        node-version: '14'
+    - run: npm install -g newman
+      shell: bash
+    
+    - name: Run Postman Collection
+      run: |
+        newman run ${{ inputs.CollectionName }} > newman_output.txt
+      shell: bash
+   
+    - run: cat newman_output.txt
+      shell: bash

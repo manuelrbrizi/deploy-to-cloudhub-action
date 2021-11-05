@@ -1,0 +1,28 @@
+name: Mule Action
+description: Action to test and deploy Mule Apps
+
+inputs:
+  projectName:
+    description: Name of the final JAR file (without jar extension)
+    required: true
+    
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v2
+    
+    - name: Download settings.xml
+      uses: actions/download-artifact@v2
+      with:
+        name: settings
+    
+    - name: Set up JDK 8
+      uses: actions/setup-java@v2
+      with:
+        java-version: '8'
+        distribution: 'adopt'
+      
+    - name: Deploy to Exchange
+      run: |
+          mvn clean deploy -e -s settings.xml -DskipTests -Dmule.artifact=target/checkout/target/${{ inputs.projectName }}.jar;
+      shell: bash

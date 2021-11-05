@@ -1,0 +1,31 @@
+name: Build jar
+description: Action to build JAR of Mule App
+    
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v2
+    
+    - name: Download settings.xml
+      uses: actions/download-artifact@v2
+      with:
+        name: settings
+    
+    - name: Set up JDK 8
+      uses: actions/setup-java@v2
+      with:
+        java-version: '8'
+        distribution: 'adopt'
+      
+    - name: Build and get jar
+      run: |
+          mvn clean package -s settings.xml -DskipTests
+          mv target/$(ls target | grep n.jar) deployableJar.jar
+          ls -l
+      shell: bash
+      
+    - name: Upload .jar
+      uses: actions/upload-artifact@v2
+      with:
+        name: deployJar
+        path: deployableJar.jar
